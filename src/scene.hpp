@@ -26,16 +26,7 @@ public:
             }
         }
 
-        for(auto* obj : objects) {
-            HitRecord temp{};
-            if(obj->Hit(r, temp)) {
-                if(temp.t < closest) {
-                    closest = temp.t;
-                    rec = temp;
-                    didHit = true;
-                }
-            }
-        }
+
         return didHit;
     }
 };

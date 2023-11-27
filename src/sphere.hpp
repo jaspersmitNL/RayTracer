@@ -29,14 +29,19 @@ public:
 
         float t = (-b - glm::sqrt(d)) / (2.0f * a);
 
-        glm::vec3 p = r.origin + t * r.direction;
-        glm::vec3 normal = glm::normalize(p - center);
+        if(t > 0.0) {
+            glm::vec3 p = r.origin + t * r.direction;
+            glm::vec3 normal = glm::normalize(p - center);
 
-        rec.t = t;
-        rec.p = p;
-        rec.normal = normal;
-        rec.material = material;
-        rec.didHit = true;
-        return true;
+            rec.t = t;
+            rec.p = p;
+            rec.normal = normal;
+            rec.material = material;
+            rec.didHit = true;
+            return true;
+        }
+
+
+        return false;
     }
 };

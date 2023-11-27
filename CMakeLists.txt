@@ -9,7 +9,9 @@ add_executable(RayTracer src/main.cpp src/vendor/stb_image_write.h src/vendor/BS
         src/sphere.hpp
         src/object.hpp
         src/scene.hpp
-        src/material.hpp)
+        src/material.hpp
+        src/camera.hpp
+        src/camera.cpp)
 
 
 target_link_libraries(RayTracer PRIVATE glm::glm)
