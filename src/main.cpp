@@ -46,10 +46,21 @@ vec3 DoPixel(uint32_t x, uint32_t y) {
     ray.origin = camera->GetPosition();
     ray.direction = camera->GetRayDirections()[x + y * WIDTH];
 
+    glm::vec3 lightDir = glm::normalize(glm::vec3(-1, -1, -1));
+
+
+
 
     HitRecord rec{};
     if (scene->Hit(ray, rec)) {
+        float lightIntensity = glm::max(glm::dot(rec.normal, -lightDir), 0.0f);
+
         color = rec.material->albedo;
+        color *= lightIntensity;
+    } else {
+        vec3 unitDirection = glm::normalize(ray.direction);
+        float t = 0.5f * (unitDirection.y + 1.0f);
+        color = (1.0f - t) * vec3(1.0f) + t * vec3(0.5f, 0.7f, 1.0f);
     }
 
 
