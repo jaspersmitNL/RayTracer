@@ -59,7 +59,7 @@ public:
 
 BS::thread_pool pool(8);
 Scene *scene = new Scene();
-Camera *camera = new Camera(45.0f, 0.1f, 100.0f);
+Camera *camera = new Camera(70.0f, 0.1f, 100.0f);
 
 
 void SetupScene() {
@@ -74,27 +74,22 @@ void SetupScene() {
 
 
     vec3 leftWallNormal = vec3(1, 0, 0);
-    scene->objects.push_back(new Plane(vec3(-1, 0, 0), leftWallNormal, red));
-    vec3 backWallNormal = vec3(0, 0, 1);
-    scene->objects.push_back(new Plane(vec3(0, 0, 2), backWallNormal, white));
+    scene->objects.push_back(new Plane(vec3(-5, 0, 0), leftWallNormal, red));
+    vec3 backWallNormal = vec3(0, 0, -1);
+    scene->objects.push_back(new Plane(vec3(0, 0, 0), backWallNormal, white));
     vec3 rightWallNormal = vec3(-1, 0, 0);
-    scene->objects.push_back(new Plane(vec3(1, 0, 0), rightWallNormal, blue));
+    scene->objects.push_back(new Plane(vec3(5, 0, 0), rightWallNormal, blue));
     vec3 topWallNormal = vec3(0, -1, 0);
-    scene->objects.push_back(new Plane(vec3(0, 1, 0), topWallNormal, white));
+    scene->objects.push_back(new Plane(vec3(0, 5, 0), topWallNormal, white));
     vec3 bottomWallNormal = vec3(0, 1, 0);
-    scene->objects.push_back(new Plane(vec3(0, -1, 0), bottomWallNormal, white));
+    scene->objects.push_back(new Plane(vec3(0, -5, 0), bottomWallNormal, white));
+
+
+    scene->objects.push_back(new Sphere(vec3(2, 0, -6), 0.5f, green));
+    scene->objects.push_back(new Sphere(vec3(-2, 0, -6), 0.5f, purple));
 
 
 
-
-
-
-//    scene->objects.push_back(new Sphere(vec3(0, 0, -1), 0.5f, purple));
-//    scene->objects.push_back(new Sphere(vec3(0, -100.5, -1), 100, green));
-//    scene->objects.push_back(new Sphere(vec3(1, 0, -1), 0.5f, red));
-//    scene->objects.push_back(new Sphere(vec3(-1, 0, -1), 0.5f, blue));
-//
-//
 
 
 
@@ -117,7 +112,7 @@ vec3 DoPixel(uint32_t x, uint32_t y) {
 
     glm::vec3 lightPos = glm::vec3(0, 0, 0);
     vec3 lightColor = vec3(0.5f, 1.0f, 1.0f);
-    float lightPointIntensity = 10.0f;
+    float lightPointIntensity = 105.0f;
 
 
     HitRecord rec{};
@@ -130,8 +125,18 @@ vec3 DoPixel(uint32_t x, uint32_t y) {
 
 
 
+        Ray shadowRay{};
+        shadowRay.origin = lightPos + rec.normal * 0.001f;
+        shadowRay.direction = lightDir;
+        HitRecord shadowRec{};
+        scene->Hit(shadowRay, shadowRec);
 
-        color = glm::clamp(rec.material->albedo * (lightColor * lightIntensity), 0.0f, 1.0f);
+        if(shadowRec.didHit && shadowRec.t < distance) {
+            color = vec3(0);
+        } else {
+            color = glm::clamp(rec.material->albedo * (lightColor * lightIntensity), 0.0f, 1.0f);
+        }
+
 
     } else {
         vec3 unitDirection = glm::normalize(ray.direction);
