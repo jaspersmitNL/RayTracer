@@ -110,15 +110,15 @@ vec3 DoPixel(uint32_t x, uint32_t y) {
 
 
 
-    glm::vec3 lightPos = glm::vec3(0, 0, -20);
+    glm::vec3 lightPos = glm::vec3(0, 0, -7);
     vec3 lightColor = vec3(0.5f, 1.0f, 1.0f);
-    float lightPointIntensity = 200.0f;
+    float lightPointIntensity = 12.0f;
 
 
     HitRecord rec{};
     if (scene->Hit(ray, rec)) {
 
-        float const distance = length(rec.t - lightPos);
+        float const distance = length(lightPos - rec.p);
 
         vec3 lightDir = glm::normalize(lightPos - rec.p);
         float lightIntensity = lightPointIntensity / (distance * distance);
@@ -126,17 +126,39 @@ vec3 DoPixel(uint32_t x, uint32_t y) {
 
 
         Ray shadowRay{};
-        shadowRay.direction = glm::normalize(lightPos - rec.p);
-        shadowRay.origin = rec.p + 0.001f * shadowRay.direction;
+        shadowRay.direction = glm::normalize(rec.p - lightPos);
+        shadowRay.origin = lightPos;
 
 
         HitRecord shadowRec{};
         scene->Hit(shadowRay, shadowRec);
 
-        if(shadowRec.didHit && shadowRec.t < distance - 0.001f) {
-            color = vec3(0);
+        if(shadowRec.didHit && (shadowRec.t < distance - 0.1f)) {
+            color = vec3(0.2f) * rec.material->albedo * lightIntensity;
         } else {
             color = glm::clamp(rec.material->albedo * (lightColor * lightIntensity), 0.0f, 1.0f);
+        }
+
+        double rX = random_double();
+        double rY = random_double();
+        double rZ = random_double();
+        glm::vec3 rDir(rX, rY, rZ);
+        rDir=glm::normalize(rDir);
+        float cos = glm::dot(rDir, rec.normal);
+        if(cos < 0) {
+            rDir*=-1;
+            cos *= -1;
+        }
+        HitRecord bounceHit{};
+        Ray bounceRay{};
+        bounceRay.direction = rDir;
+        bounceRay.origin = rec.p + rDir*0.01f;
+        if(scene->Hit(bounceRay, bounceHit)) {
+            float in = 1.0f/(bounceHit.t*bounceHit.t);
+            if(in > 1.0) in = 1.0f;
+            color+=bounceHit.material->albedo*0.1f * in*cos;
+            glm::clamp(color, 0.0f, 1.0f);
+
         }
 
 
