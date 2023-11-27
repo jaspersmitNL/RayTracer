@@ -85,7 +85,7 @@ void SetupScene() {
     scene->objects.push_back(new Plane(vec3(0, -5, 0), bottomWallNormal, white));
 
 
-    scene->objects.push_back(new Sphere(vec3(2, 0, -6), 0.5f, green));
+    scene->objects.push_back(new Sphere(vec3(2, -1.9, -6), 0.5f, green));
     scene->objects.push_back(new Sphere(vec3(-2, 0, -6), 0.5f, purple));
 
 
@@ -110,9 +110,9 @@ vec3 DoPixel(uint32_t x, uint32_t y) {
 
 
 
-    glm::vec3 lightPos = glm::vec3(0, 0, 0);
+    glm::vec3 lightPos = glm::vec3(0, 0, -20);
     vec3 lightColor = vec3(0.5f, 1.0f, 1.0f);
-    float lightPointIntensity = 105.0f;
+    float lightPointIntensity = 200.0f;
 
 
     HitRecord rec{};
@@ -126,12 +126,14 @@ vec3 DoPixel(uint32_t x, uint32_t y) {
 
 
         Ray shadowRay{};
-        shadowRay.origin = lightPos + rec.normal * 0.001f;
-        shadowRay.direction = lightDir;
+        shadowRay.direction = glm::normalize(lightPos - rec.p);
+        shadowRay.origin = rec.p + 0.001f * shadowRay.direction;
+
+
         HitRecord shadowRec{};
         scene->Hit(shadowRay, shadowRec);
 
-        if(shadowRec.didHit && shadowRec.t < distance) {
+        if(shadowRec.didHit && shadowRec.t < distance - 0.001f) {
             color = vec3(0);
         } else {
             color = glm::clamp(rec.material->albedo * (lightColor * lightIntensity), 0.0f, 1.0f);
