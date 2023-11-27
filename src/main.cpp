@@ -13,12 +13,44 @@
 
 using namespace glm;
 
+struct Camera {
+    vec3 position;
+    vec3 forwardDirection;
+    float fov;
+
+
+    glm::mat4 m_Projection{ 1.0f };
+    glm::mat4 m_View{ 1.0f };
+    glm::mat4 m_InverseProjection{ 1.0f };
+    glm::mat4 m_InverseView{ 1.0f };
+
+
+
+
+    Camera(float fov){
+
+        position = glm::vec3(0, 0, -1);
+        forwardDirection = glm::vec3(0, 0, 6);
+        this->fov = fov;
+
+        Update();
+
+    }
+
+    void Update() {
+        m_Projection = glm::perspectiveFov(glm::radians(fov), (float)WIDTH, (float)HEIGHT, 0.1f, 100.0f);
+        m_InverseProjection = glm::inverse(m_Projection);
+
+
+        m_View = glm::lookAt(position, position + forwardDirection, vec3(0, 1, 0));
+        m_InverseView = glm::inverse(m_View);
+    }
+};
+
 BS::thread_pool pool(1);
-
-
-
 Scene* scene = new Scene();
 
+Camera* camera = new Camera( 90.0f);
 
 
 
@@ -47,7 +79,11 @@ vec3 DoPixel(vec2 coord) {
 
     Ray ray{};
     ray.origin = vec3(0, 0, 2.0f);
-    ray.direction = (vec3(coord.x, coord.y, -1));
+
+    glm::vec4 target = camera->m_InverseProjection * glm::vec4(coord.x, coord.y, 1, 1);
+    glm::vec3 rayDirection = glm::vec3(camera->m_InverseView * glm::vec4(glm::normalize(glm::vec3(target) / target.w), 0)); // World space
+
+    ray.direction = rayDirection;
 
 
     HitRecord rec{};
