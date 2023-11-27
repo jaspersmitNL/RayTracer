@@ -4,6 +4,9 @@ project(RayTracer)
 set(CMAKE_CXX_STANDARD 20)
 find_package(glm CONFIG REQUIRED)
 
+
+# enable speed optimizations for debug builds
+
 add_executable(RayTracer src/main.cpp src/vendor/stb_image_write.h src/vendor/BS_thread_pool.hpp
         src/ray.hpp
         src/sphere.hpp
