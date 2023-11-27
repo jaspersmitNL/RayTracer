@@ -75,8 +75,16 @@ void SetupScene() {
 
     vec3 leftWallNormal = vec3(1, 0, 0);
     scene->objects.push_back(new Plane(vec3(-1, 0, 0), leftWallNormal, red));
-    vec3 backWallNormal = vec3(0, 0, -1);
+    vec3 backWallNormal = vec3(0, 0, 1);
     scene->objects.push_back(new Plane(vec3(0, 0, 2), backWallNormal, white));
+    vec3 rightWallNormal = vec3(-1, 0, 0);
+    scene->objects.push_back(new Plane(vec3(1, 0, 0), rightWallNormal, blue));
+    vec3 topWallNormal = vec3(0, -1, 0);
+    scene->objects.push_back(new Plane(vec3(0, 1, 0), topWallNormal, white));
+    vec3 bottomWallNormal = vec3(0, 1, 0);
+    scene->objects.push_back(new Plane(vec3(0, -1, 0), bottomWallNormal, white));
+
+
 
 
 
@@ -108,7 +116,8 @@ vec3 DoPixel(uint32_t x, uint32_t y) {
 
 
     glm::vec3 lightPos = glm::vec3(0, 0, 0);
-    float lightPointIntensity = 100.0f;
+    vec3 lightColor = vec3(0.5f, 1.0f, 1.0f);
+    float lightPointIntensity = 10.0f;
 
 
     HitRecord rec{};
@@ -116,13 +125,13 @@ vec3 DoPixel(uint32_t x, uint32_t y) {
 
         float const distance = length(rec.t - lightPos);
 
-
         vec3 lightDir = glm::normalize(lightPos - rec.p);
-        float lightIntensity = glm::dot(lightDir, rec.normal);
-        lightIntensity = lightIntensity * (lightPointIntensity /( distance * distance));
-        lightIntensity = glm::clamp(lightIntensity, 0.0f, 1.0f);
+        float lightIntensity = lightPointIntensity / (distance * distance);
 
-        color = rec.material->albedo;
+
+
+
+        color = glm::clamp(rec.material->albedo * (lightColor * lightIntensity), 0.0f, 1.0f);
 
     } else {
         vec3 unitDirection = glm::normalize(ray.direction);
