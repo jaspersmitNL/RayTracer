@@ -15,6 +15,8 @@
 
 #define WIDTH 1440
 #define HEIGHT 1080
+#define NUM_SAMPLES 150
+
 using namespace glm;
 
 inline double random_double() {
@@ -24,22 +26,22 @@ inline double random_double() {
 }
 
 
-class Plane: public RTObject {
+class Plane : public RTObject {
 public:
     glm::vec3 center;
     glm::vec3 normal;
-    Material* material;
+    Material *material;
 
-    Plane(glm::vec3 center, glm::vec3 normal, Material* material): center(center), normal(normal), material(material) {
+    Plane(glm::vec3 center, glm::vec3 normal, Material *material) : center(center), normal(normal), material(material) {
     }
 
     bool Hit(const Ray &r, HitRecord &rec) const override {
 
         float denom = glm::dot(normal, r.direction);
-        if(denom < 1e-6) {
+        if (denom < 1e-6) {
             glm::vec3 p0l0 = center - r.origin;
             float t = glm::dot(p0l0, normal) / denom;
-            if(t >= 0) {
+            if (t >= 0) {
                 glm::vec3 p = r.origin + t * r.direction;
                 glm::vec3 normal = glm::normalize(p - center);
 
@@ -57,7 +59,7 @@ public:
 };
 
 
-BS::thread_pool pool(8);
+BS::thread_pool pool(24);
 Scene *scene = new Scene();
 Camera *camera = new Camera(70.0f, 0.1f, 100.0f);
 
@@ -67,10 +69,7 @@ void SetupScene() {
     auto *green = new Material(vec3(0.2f, 0.8f, 0.2f));
     auto *red = new Material(vec3(0.8f, 0.2f, 0.2f));
     auto *blue = new Material(vec3(0.2f, 0.2f, 0.8f));
-    auto* white = new Material(vec3(1.0f, 1.0f, 1.0f));
-
-
-
+    auto *white = new Material(vec3(1.0f, 1.0f, 1.0f));
 
 
     vec3 leftWallNormal = vec3(1, 0, 0);
@@ -89,10 +88,6 @@ void SetupScene() {
     scene->objects.push_back(new Sphere(vec3(-2, 0, -6), 0.5f, purple));
 
 
-
-
-
-
     camera->OnResize(WIDTH, HEIGHT);
 
 
@@ -109,7 +104,6 @@ vec3 DoPixel(uint32_t x, uint32_t y) {
     ray.direction = camera->GetRayDirections()[x + y * WIDTH];
 
 
-
     glm::vec3 lightPos = glm::vec3(0, 0, -7);
     vec3 lightColor = vec3(0.5f, 1.0f, 1.0f);
     float lightPointIntensity = 12.0f;
@@ -124,7 +118,6 @@ vec3 DoPixel(uint32_t x, uint32_t y) {
         float lightIntensity = lightPointIntensity / (distance * distance);
 
 
-
         Ray shadowRay{};
         shadowRay.direction = glm::normalize(rec.p - lightPos);
         shadowRay.origin = lightPos;
@@ -133,7 +126,7 @@ vec3 DoPixel(uint32_t x, uint32_t y) {
         HitRecord shadowRec{};
         scene->Hit(shadowRay, shadowRec);
 
-        if(shadowRec.didHit && (shadowRec.t < distance - 0.1f)) {
+        if (shadowRec.didHit && (shadowRec.t < distance - 0.1f)) {
             color = vec3(0.2f) * rec.material->albedo * lightIntensity;
         } else {
             color = glm::clamp(rec.material->albedo * (lightColor * lightIntensity), 0.0f, 1.0f);
@@ -143,20 +136,20 @@ vec3 DoPixel(uint32_t x, uint32_t y) {
         double rY = random_double();
         double rZ = random_double();
         glm::vec3 rDir(rX, rY, rZ);
-        rDir=glm::normalize(rDir);
+        rDir = glm::normalize(rDir);
         float cos = glm::dot(rDir, rec.normal);
-        if(cos < 0) {
-            rDir*=-1;
+        if (cos < 0) {
+            rDir *= -1;
             cos *= -1;
         }
         HitRecord bounceHit{};
         Ray bounceRay{};
         bounceRay.direction = rDir;
-        bounceRay.origin = rec.p + rDir*0.01f;
-        if(scene->Hit(bounceRay, bounceHit)) {
-            float in = 1.0f/(bounceHit.t*bounceHit.t);
-            if(in > 1.0) in = 1.0f;
-            color+=bounceHit.material->albedo*0.1f * in*cos;
+        bounceRay.origin = rec.p + rDir * 0.01f;
+        if (scene->Hit(bounceRay, bounceHit)) {
+            float in = 1.0f / (bounceHit.t * bounceHit.t);
+            if (in > 1.0) in = 1.0f;
+            color += bounceHit.material->albedo * 0.1f * in * cos;
             glm::clamp(color, 0.0f, 1.0f);
 
         }
@@ -188,20 +181,28 @@ int main() {
 
 
     for (uint32_t y = 0; y < HEIGHT; y++) {
-        for (uint32_t x = 0; x < WIDTH; x++) {
+
+        pool.submit([y, data]() {
+            for (uint32_t x = 0; x < WIDTH; x++) {
+
+                vec3 finalColor(0);
+
+                for (int i = 0; i < NUM_SAMPLES; i++) {
+                    finalColor += DoPixel(x, y);
+                }
+
+                finalColor /= NUM_SAMPLES;
 
 
-            vec3 finalColor = DoPixel(x, y);
+
+                data[(y * WIDTH + x) * 3] = (unsigned char) (finalColor.x * 255);
+                data[(y * WIDTH + x) * 3 + 1] = (unsigned char) (finalColor.y * 255);
+                data[(y * WIDTH + x) * 3 + 2] = (unsigned char) (finalColor.z * 255);
+            }
+
+        });
 
 
-            data[(y * WIDTH + x) * 3] = (unsigned char) (finalColor.x * 255);
-            data[(y * WIDTH + x) * 3 + 1] = (unsigned char) (finalColor.y * 255);
-            data[(y * WIDTH + x) * 3 + 2] = (unsigned char) (finalColor.z * 255);
-        }
-
-        //print progress every 10%
-        if (y % (HEIGHT / 10) == 0)
-            std::cout << "Progress: " << (float) y / (float) HEIGHT * 100.0f << "%" << std::endl;
 
 
     }
