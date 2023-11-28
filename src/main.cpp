@@ -94,10 +94,12 @@ void Draw() {
 
 
     ImGui::Begin("Raytracer");
-    ImGui::Image(texture, ImVec2(WIDTH, HEIGHT), ImVec2(0, 1), ImVec2(1, 0));
-    if(ImGui::Button("Render")) {
-        scene->shouldRender = true;
-    }
+    ImVec2 windowSize = ImGui::GetWindowSize();
+
+    windowSize.x -= 20;
+    windowSize.y -= 40;
+
+    ImGui::Image(texture, windowSize, ImVec2(0, 1), ImVec2(1, 0));
     ImGui::End();
 
 
@@ -109,7 +111,10 @@ void Draw() {
 
     //spheres and their materials
     ImGui::Begin("Scene");
-
+    if(ImGui::Button("Render")) {
+        scene->shouldRender = true;
+    }
+    ImGui::Separator();
     for(int i = 0; i < scene->objects.size(); i++) {
         if(dynamic_cast<Sphere*>(scene->objects[i])) {
             ImGui::PushID(i);
