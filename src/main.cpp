@@ -4,6 +4,7 @@
 #include <chrono>
 
 #define SDL_MAIN_HANDLED
+
 #include <SDL2/SDL.h>
 
 
@@ -22,6 +23,8 @@
 
 using namespace glm;
 
+SDL_Window *window = nullptr;
+SDL_Renderer *renderer = nullptr;
 
 
 BS::thread_pool pool(8);
@@ -34,10 +37,7 @@ void SetupScene() {
     auto *green = new Material(vec3(0.2f, 0.8f, 0.2f));
     auto *red = new Material(vec3(0.8f, 0.2f, 0.2f));
     auto *blue = new Material(vec3(0.2f, 0.2f, 0.8f));
-    auto* white = new Material(vec3(1.0f, 1.0f, 1.0f));
-
-
-
+    auto *white = new Material(vec3(1.0f, 1.0f, 1.0f));
 
 
     vec3 leftWallNormal = vec3(1, 0, 0);
@@ -56,15 +56,79 @@ void SetupScene() {
     scene->objects.push_back(new Sphere(vec3(-2, 0, -4), 1.0f, purple));
 
 
-
-
-
-
     camera->OnResize(WIDTH, HEIGHT);
 
 
 }
 
+unsigned char *data = new unsigned char[WIDTH * HEIGHT * 3];
+
+SDL_Texture *texture = nullptr;
+
+void Draw() {
+
+
+
+    if(scene->shouldRender) {
+        scene->shouldRender = false;
+        for (uint32_t y = 0; y < HEIGHT; y++) {
+            for (uint32_t x = 0; x < WIDTH; x++) {
+
+                pool.submit([x, y]() -> void {
+                    vec3 finalColor = RTRenderer::DoPixel(x, y, scene, camera);
+                    data[(y * WIDTH + x) * 3] = (unsigned char) (finalColor.x * 255);
+                    data[(y * WIDTH + x) * 3 + 1] = (unsigned char) (finalColor.y * 255);
+                    data[(y * WIDTH + x) * 3 + 2] = (unsigned char) (finalColor.z * 255);
+                });
+
+
+            }
+        }
+        pool.wait_for_tasks();
+
+    }
+
+
+    SDL_UpdateTexture(texture, nullptr, data, WIDTH * 3);
+
+
+
+    ImGui::Begin("Raytracer");
+    ImGui::Image(texture, ImVec2(WIDTH, HEIGHT), ImVec2(0, 1), ImVec2(1, 0));
+    if(ImGui::Button("Render")) {
+        scene->shouldRender = true;
+    }
+    ImGui::End();
+
+
+    ImGui::Begin("Settings");
+        ImGui::SliderInt("Samples Per Pixel", &scene->samplesPerPixel, 1, 200);
+        ImGui::SliderInt("Max Depth", &scene->maxDepth, 1, 10);
+    ImGui::End();
+
+
+    //spheres and their materials
+    ImGui::Begin("Scene");
+
+    for(int i = 0; i < scene->objects.size(); i++) {
+        if(dynamic_cast<Sphere*>(scene->objects[i])) {
+            ImGui::PushID(i);
+            Sphere* sphere = dynamic_cast<Sphere*>(scene->objects[i]);
+            ImGui::Text("Sphere %d", i);
+            ImGui::SliderFloat3("Position", &sphere->center.x, -5.0f, 5.0f);
+            ImGui::SliderFloat("Radius", &sphere->radius, 0.1f, 5.0f);
+            ImGui::ColorEdit3("Color", &sphere->material->albedo.x);
+            ImGui::Separator();
+            ImGui::PopID();
+        }
+    }
+
+    ImGui::End();
+
+
+
+
+}
 
 
 int main() {
@@ -74,16 +138,22 @@ int main() {
     SetupScene();
 
 
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER);
+    window = SDL_CreateWindow("Raytracer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1080, 720,
+                              SDL_WINDOW_SHOWN);
 
-    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER );
-    SDL_Window *window = SDL_CreateWindow("Raytracer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1080, 720,
-                                          SDL_WINDOW_SHOWN);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
 
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
+    //create texture
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
+    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+
+
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO &io = ImGui::GetIO();
+    (void) io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
@@ -104,12 +174,15 @@ int main() {
         }
 
 
-
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
-        bool show_demo_window = true;
-        ImGui::ShowDemoWindow(&show_demo_window);
+
+        //begin dockspace
+        ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+
+
+        Draw();
 
 
         ImGui::Render();

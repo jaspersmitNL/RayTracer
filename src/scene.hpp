@@ -8,6 +8,11 @@ class Scene: public RTObject {
 public:
     std::vector<RTObject*> objects;
 
+    bool shouldRender = true;
+
+    int samplesPerPixel = 100;
+    int maxDepth = 5;
+
     Scene() {
     }
 
