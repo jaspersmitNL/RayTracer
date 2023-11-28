@@ -1,65 +1,30 @@
+#include "ray.hpp"
 #include <iostream>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/random.hpp>
 #include <chrono>
-#include <random>
+
+#define SDL_MAIN_HANDLED
+#include <SDL2/SDL.h>
 
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
 #include "vendor/stb_image_write.h"
 #include "vendor/BS_thread_pool.hpp"
+#include "vendor/imgui/imgui.h"
+#include "vendor/imgui/imgui_impl_sdl2.h"
+#include "vendor/imgui/imgui_impl_sdlrenderer2.h"
 #include "scene.hpp"
 #include "camera.hpp"
+#include "plane.hpp"
+#include "renderer.hpp"
 
-#define WIDTH 1440
-#define HEIGHT 1080
-#define NUM_SAMPLES 150
 
 using namespace glm;
 
-inline double random_double() {
-    static std::uniform_real_distribution<double> distribution(0.0, 1.0);
-    static std::mt19937 generator;
-    return distribution(generator);
-}
 
 
-class Plane : public RTObject {
-public:
-    glm::vec3 center;
-    glm::vec3 normal;
-    Material *material;
-
-    Plane(glm::vec3 center, glm::vec3 normal, Material *material) : center(center), normal(normal), material(material) {
-    }
-
-    bool Hit(const Ray &r, HitRecord &rec) const override {
-
-        float denom = glm::dot(normal, r.direction);
-        if (denom < 1e-6) {
-            glm::vec3 p0l0 = center - r.origin;
-            float t = glm::dot(p0l0, normal) / denom;
-            if (t >= 0) {
-                glm::vec3 p = r.origin + t * r.direction;
-                glm::vec3 normal = glm::normalize(p - center);
-
-                rec.t = t;
-                rec.p = p;
-                rec.normal = normal;
-                rec.material = material;
-                rec.didHit = true;
-                return true;
-            }
-        }
-
-        return false;
-    }
-};
-
-
-BS::thread_pool pool(24);
+BS::thread_pool pool(8);
 Scene *scene = new Scene();
 Camera *camera = new Camera(70.0f, 0.1f, 100.0f);
 
@@ -69,7 +34,10 @@ void SetupScene() {
     auto *green = new Material(vec3(0.2f, 0.8f, 0.2f));
     auto *red = new Material(vec3(0.8f, 0.2f, 0.2f));
     auto *blue = new Material(vec3(0.2f, 0.2f, 0.8f));
-    auto *white = new Material(vec3(1.0f, 1.0f, 1.0f));
+    auto* white = new Material(vec3(1.0f, 1.0f, 1.0f));
+
+
+
 
 
     vec3 leftWallNormal = vec3(1, 0, 0);
@@ -84,8 +52,12 @@ void SetupScene() {
     scene->objects.push_back(new Plane(vec3(0, -5, 0), bottomWallNormal, white));
 
 
-    scene->objects.push_back(new Sphere(vec3(2, -1.9, -6), 0.5f, green));
-    scene->objects.push_back(new Sphere(vec3(-2, 0, -6), 0.5f, purple));
+    scene->objects.push_back(new Sphere(vec3(2, -1.9, -4), 1.0f, green));
+    scene->objects.push_back(new Sphere(vec3(-2, 0, -4), 1.0f, purple));
+
+
+
+
 
 
     camera->OnResize(WIDTH, HEIGHT);
@@ -93,77 +65,6 @@ void SetupScene() {
 
 }
 
-
-vec3 DoPixel(uint32_t x, uint32_t y) {
-
-    vec3 color(0);
-
-
-    Ray ray{};
-    ray.origin = camera->GetPosition();
-    ray.direction = camera->GetRayDirections()[x + y * WIDTH];
-
-
-    glm::vec3 lightPos = glm::vec3(0, 0, -7);
-    vec3 lightColor = vec3(0.5f, 1.0f, 1.0f);
-    float lightPointIntensity = 12.0f;
-
-
-    HitRecord rec{};
-    if (scene->Hit(ray, rec)) {
-
-        float const distance = length(lightPos - rec.p);
-
-        vec3 lightDir = glm::normalize(lightPos - rec.p);
-        float lightIntensity = lightPointIntensity / (distance * distance);
-
-
-        Ray shadowRay{};
-        shadowRay.direction = glm::normalize(rec.p - lightPos);
-        shadowRay.origin = lightPos;
-
-
-        HitRecord shadowRec{};
-        scene->Hit(shadowRay, shadowRec);
-
-        if (shadowRec.didHit && (shadowRec.t < distance - 0.1f)) {
-            color = vec3(0.2f) * rec.material->albedo * lightIntensity;
-        } else {
-            color = glm::clamp(rec.material->albedo * (lightColor * lightIntensity), 0.0f, 1.0f);
-        }
-
-        double rX = random_double();
-        double rY = random_double();
-        double rZ = random_double();
-        glm::vec3 rDir(rX, rY, rZ);
-        rDir = glm::normalize(rDir);
-        float cos = glm::dot(rDir, rec.normal);
-        if (cos < 0) {
-            rDir *= -1;
-            cos *= -1;
-        }
-        HitRecord bounceHit{};
-        Ray bounceRay{};
-        bounceRay.direction = rDir;
-        bounceRay.origin = rec.p + rDir * 0.01f;
-        if (scene->Hit(bounceRay, bounceHit)) {
-            float in = 1.0f / (bounceHit.t * bounceHit.t);
-            if (in > 1.0) in = 1.0f;
-            color += bounceHit.material->albedo * 0.1f * in * cos;
-            glm::clamp(color, 0.0f, 1.0f);
-
-        }
-
-
-    } else {
-        vec3 unitDirection = glm::normalize(ray.direction);
-        float t = 0.5f * (unitDirection.y + 1.0f);
-        color = (1.0f - t) * vec3(1.0f) + t * vec3(0.5f, 0.7f, 1.0f);
-    }
-
-
-    return color;
-}
 
 
 int main() {
@@ -173,52 +74,97 @@ int main() {
     SetupScene();
 
 
-    auto *data = new unsigned char[WIDTH * HEIGHT * 3];
+
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER );
+    SDL_Window *window = SDL_CreateWindow("Raytracer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1080, 720,
+                                          SDL_WINDOW_SHOWN);
+
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
+
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
+    ImGui_ImplSDLRenderer2_Init(renderer);
 
 
-    //start time
-    auto start = std::chrono::high_resolution_clock::now();
-
-
-    for (uint32_t y = 0; y < HEIGHT; y++) {
-
-        pool.submit([y, data]() {
-            for (uint32_t x = 0; x < WIDTH; x++) {
-
-                vec3 finalColor(0);
-
-                for (int i = 0; i < NUM_SAMPLES; i++) {
-                    finalColor += DoPixel(x, y);
-                }
-
-                finalColor /= NUM_SAMPLES;
-
-
-
-                data[(y * WIDTH + x) * 3] = (unsigned char) (finalColor.x * 255);
-                data[(y * WIDTH + x) * 3 + 1] = (unsigned char) (finalColor.y * 255);
-                data[(y * WIDTH + x) * 3 + 2] = (unsigned char) (finalColor.z * 255);
+    while (true) {
+        SDL_Event event;
+        if (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                break;
             }
+            ImGui_ImplSDL2_ProcessEvent(&event);
+        }
 
-        });
 
 
+        ImGui_ImplSDLRenderer2_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
+        bool show_demo_window = true;
+        ImGui::ShowDemoWindow(&show_demo_window);
+
+
+        ImGui::Render();
+        SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+        SDL_RenderClear(renderer);
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
+        SDL_RenderPresent(renderer);
 
 
     }
 
-
-    pool.wait_for_tasks();
-
-
-    //find how long it took in miliseconds
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    std::cout << "Time taken: " << duration << "ms" << std::endl;
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
 
 
-    stbi_flip_vertically_on_write(1);
-    stbi_write_png("test.png", WIDTH, HEIGHT, 3, data, WIDTH * 3);
+
+
+
+//    auto *data = new unsigned char[WIDTH * HEIGHT * 3];
+//
+//
+//    //start time
+//    auto start = std::chrono::high_resolution_clock::now();
+//
+//
+//    for (uint32_t y = 0; y < HEIGHT; y++) {
+//        for (uint32_t x = 0; x < WIDTH; x++) {
+//
+//            pool.submit([x, y, data]() -> void {
+//                vec3 finalColor = RTRenderer::DoPixel(x, y, scene, camera);
+//
+//
+//                data[(y * WIDTH + x) * 3] = (unsigned char) (finalColor.x * 255);
+//                data[(y * WIDTH + x) * 3 + 1] = (unsigned char) (finalColor.y * 255);
+//                data[(y * WIDTH + x) * 3 + 2] = (unsigned char) (finalColor.z * 255);
+//            });
+//
+//
+//        }
+//    }
+//
+//
+//    pool.wait_for_tasks();
+//
+//
+//    //find how long it took in miliseconds
+//    auto end = std::chrono::high_resolution_clock::now();
+//    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+//    std::cout << "Time taken: " << duration << "ms" << std::endl;
+//
+//
+//    stbi_flip_vertically_on_write(1);
+//    stbi_write_png("test.png", WIDTH, HEIGHT, 3, data, WIDTH * 3);
 
     return 0;
 }

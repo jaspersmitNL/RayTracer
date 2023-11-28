@@ -3,18 +3,19 @@ project(RayTracer)
 
 set(CMAKE_CXX_STANDARD 20)
 find_package(glm CONFIG REQUIRED)
-
+find_package(SDL2 CONFIG REQUIRED)
 
 # enable speed optimizations for debug builds
 
-add_executable(RayTracer src/main.cpp src/vendor/stb_image_write.h src/vendor/BS_thread_pool.hpp
-        src/ray.hpp
-        src/sphere.hpp
-        src/object.hpp
-        src/scene.hpp
-        src/material.hpp
-        src/camera.hpp
-        src/camera.cpp)
+file(GLOB_RECURSE SOURCES src/*.cpp src/*.hpp src/*.h)
 
 
-target_link_libraries(RayTracer PRIVATE glm::glm)
+add_executable(RayTracer ${SOURCES})
+
+
+target_link_libraries(RayTracer
+        PRIVATE
+        glm::glm
+        $<TARGET_NAME_IF_EXISTS:SDL2::SDL2main>
+        $<IF:$<TARGET_EXISTS:SDL2::SDL2>,SDL2::SDL2,SDL2::SDL2-static>
+)
